@@ -112,8 +112,6 @@ O enunciado não definia alguns casos, e eu os preenchi assim:
 | Supermercado Alvorada (Matriz): v5.0, backup de 7 dias, vendas −40%, 8 chamados | **4** | Alto Risco |
 | Padaria & Confeitaria Estrela (Ourinhos): v5.2, backup de hoje 450MB, vendas em alta, 1 chamado | **100** | Baixo Risco |
 
-> **Nota:** o enunciado indicava ~31 para o Alvorada e 95 para a Padaria. Aplicando as regras de pontuação exatamente como especificadas, esses valores não são atingíveis (o Alvorada soma 0 + 0 + 2 + 1,5 = 3,5). Optamos por manter as regras fiéis ao enunciado. Se a organização desejar calibrar pesos ou faixas, a lógica está isolada em `internal/health/health.go`.
-
 ## Motor de recomendação
 
 Todas as ações aplicáveis são listadas juntas:
