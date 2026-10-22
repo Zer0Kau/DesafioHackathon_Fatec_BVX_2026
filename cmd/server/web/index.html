@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="pt-BR" class="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BVX Pulse · Cliente 360</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://unpkg.com/lucide@latest"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+<style>
+  body { background: radial-gradient(1200px 600px at 80% -10%, #12335a55, transparent), #0a192f; color: #e6f1ff; }
+  .card { background: rgba(17, 34, 64, .75); border: 1px solid rgba(0, 210, 255, .12); border-radius: 14px; }
+  .glow { box-shadow: 0 0 24px rgba(0, 210, 255, .15); }
+  @keyframes flash { 0% { background: rgba(0, 210, 255, .35); } 100% { background: transparent; } }
+  .flash { animation: flash 2.2s ease-out; }
+  @keyframes slidein { from { transform: translateX(120%); opacity: 0; } to { transform: none; opacity: 1; } }
+  .toast { animation: slidein .35s ease-out; }
+  @keyframes pulsebell { 0%,100% { transform: rotate(0); } 25% { transform: rotate(-14deg); } 75% { transform: rotate(14deg); } }
+  .ring { animation: pulsebell .6s ease-in-out 3; }
+  .ring-gauge { transition: stroke-dasharray .8s ease, stroke .4s; }
+  ::-webkit-scrollbar { width: 8px; height: 8px; } ::-webkit-scrollbar-thumb { background: #1d3a63; border-radius: 4px; }
+</style>
+</head>
+<body class="min-h-screen font-sans">
+
+<header class="sticky top-0 z-30 backdrop-blur bg-[#0a192f]/80 border-b border-cyan-400/10">
+  <div class="max-w-7xl mx-auto px-4 py-3 flex items-center gap-4">
+    <div class="flex items-center gap-3">
+      <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-[#00d2ff] to-blue-600 flex items-center justify-center glow"><i data-lucide="activity" class="w-6 h-6 text-[#0a192f]"></i></div>
+      <div><h1 class="text-lg font-bold leading-tight">BVX Pulse <span class="text-[#00d2ff]">· Cliente 360</span></h1>
+      <p class="text-xs text-slate-400">Monitoramento proativo de PDVs</p></div>
+    </div>
+    <div class="ml-auto flex items-center gap-4">
+      <div id="live" class="flex items-center gap-2 text-xs text-slate-400"><span class="relative flex h-2.5 w-2.5"><span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span><span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span></span><span id="liveTxt">AO VIVO</span></div>
+      <div class="relative">
+        <button id="bellBtn" class="relative p-2 rounded-lg hover:bg-white/5" aria-label="Notificações">
+          <i id="bellIcon" data-lucide="bell" class="w-6 h-6"></i>
+          <span id="bellCount" class="hidden absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center">0</span>
+        </button>
+        <div id="bellPanel" class="hidden absolute right-0 mt-2 w-96 card glow p-3 max-h-96 overflow-auto">
+          <div class="flex justify-between items-center mb-2"><b class="text-sm">Alertas críticos</b><button id="bellClear" class="text-xs text-cyan-300 hover:underline">limpar</button></div>
+          <div id="bellList" class="space-y-2 text-sm"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div id="banner" class="hidden bg-red-600/90 text-white text-sm font-semibold px-4 py-2 text-center"></div>
+</header>
+
+<div id="toasts" class="fixed top-20 right-4 z-50 space-y-2 w-96 max-w-[92vw]"></div>
+
+<main class="max-w-7xl mx-auto px-4 py-6 space-y-6">
+  <section class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+    <div class="card p-4"><div class="flex justify-between text-slate-400 text-sm"><span>PDVs Monitorados</span><i data-lucide="server" class="w-5 h-5 text-[#00d2ff]"></i></div><div id="kTotal" class="text-4xl font-extrabold mt-2">–</div></div>
+    <div class="card p-4"><div class="flex justify-between text-slate-400 text-sm"><span>Saudáveis</span><i data-lucide="shield-check" class="w-5 h-5 text-emerald-400"></i></div><div id="kOk" class="text-4xl font-extrabold mt-2 text-emerald-400">–</div></div>
+    <div class="card p-4"><div class="flex justify-between text-slate-400 text-sm"><span>Em Atenção</span><i data-lucide="alert-triangle" class="w-5 h-5 text-yellow-400"></i></div><div id="kWarn" class="text-4xl font-extrabold mt-2 text-yellow-400">–</div></div>
+    <div class="card p-4"><div class="flex justify-between text-slate-400 text-sm"><span>Alto Risco</span><i data-lucide="siren" class="w-5 h-5 text-red-500"></i></div><div id="kCrit" class="text-4xl font-extrabold mt-2 text-red-500">–</div></div>
+  </section>
+
+  <section class="grid lg:grid-cols-3 gap-4">
+    <div class="card p-4"><h2 class="font-semibold mb-2 text-sm text-slate-300">Distribuição de Versões</h2><div class="h-56"><canvas id="chVer"></canvas></div></div>
+    <div class="card p-4"><h2 class="font-semibold mb-2 text-sm text-slate-300">Saúde dos Backups (últimas 24h)</h2><div class="h-56"><canvas id="chBk"></canvas></div></div>
+    <div class="card p-4"><h2 class="font-semibold mb-2 text-sm text-slate-300 flex items-center gap-2"><i data-lucide="radio" class="w-4 h-4 text-[#00d2ff]"></i>Eventos ao vivo</h2><div id="evLog" class="h-56 overflow-auto space-y-1.5 text-xs"><p class="text-slate-500">Aguardando telemetria…</p></div></div>
+  </section>
+
+  <section class="card">
+    <div class="p-4 flex items-center justify-between border-b border-white/5">
+      <div><h2 class="font-bold text-lg flex items-center gap-2"><i data-lucide="list-ordered" class="w-5 h-5 text-[#00d2ff]"></i>Fila Inteligente de Priorização</h2><p class="text-xs text-slate-400">Menor Health Score primeiro: quem atender agora.</p></div>
+      <span id="updated" class="text-xs text-slate-500"></span>
+    </div>
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead class="text-xs uppercase text-slate-400 bg-black/20"><tr>
+          <th class="p-3 text-left">#</th><th class="p-3 text-left">Cliente</th><th class="p-3 text-left">Versão</th><th class="p-3 text-left">Backup</th>
+          <th class="p-3 text-left">Uso (7d)</th><th class="p-3 text-left">Chamados</th><th class="p-3 text-left">Health Score</th><th class="p-3"></th></tr></thead>
+        <tbody id="queue"></tbody>
+      </table>
+    </div>
+  </section>
+</main>
+
+<div id="overlay" class="hidden fixed inset-0 bg-black/60 z-40"></div>
+<aside id="panel" class="fixed top-0 right-0 h-full w-full max-w-xl z-50 bg-[#0b1d38] border-l border-cyan-400/20 transform translate-x-full transition-transform duration-300 overflow-auto">
+  <div id="panelBody" class="p-6"></div>
+</aside>
+
+<script>
+const COLORS = { BAIXO_RISCO: '#10b981', ATENCAO: '#facc15', ALTO_RISCO: '#ef4444' };
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const fmtDate = s => new Date(s).toLocaleString('pt-BR');
+
+let clients = [], prev = {}, selected = null, firstLoad = true, unread = 0, seenEvents = new Set();
+
+// ---------- charts ----------
+const baseOpts = { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { color: '#cbd5e1' } } } };
+const chVer = new Chart($('chVer'), { type: 'doughnut', data: { labels: ['v5.2', 'v5.1', 'v5.0 ou inferior'], datasets: [{ data: [0,0,0], backgroundColor: ['#10b981', '#facc15', '#ef4444'], borderColor: '#0a192f' }] }, options: baseOpts });
+const chBk = new Chart($('chBk'), { type: 'doughnut', data: { labels: ['OK (<24h, íntegro)', 'Atrasado', 'Corrompido / truncado'], datasets: [{ data: [0,0,0], backgroundColor: ['#00d2ff', '#facc15', '#ef4444'], borderColor: '#0a192f' }] }, options: baseOpts });
+
+function updateCharts() {
+  const v = [0,0,0], b = [0,0,0];
+  clients.forEach(c => {
+    v[c.version === '5.2' || c.version === 'v5.2' ? 0 : c.version === 'v5.1' ? 1 : 2]++;
+    if (!c.backup_integrity_ok || c.backup_size_anomaly) b[2]++;
+    else if (c.backup_age_hours <= 24) b[0]++;
+    else b[1]++;
+  });
+  chVer.data.datasets[0].data = v; chVer.update();
+  chBk.data.datasets[0].data = b; chBk.update();
+}
+
+// ---------- rendering ----------
+const badge = (txt, color) => `<span class="inline-block px-2 py-0.5 rounded-full text-xs font-semibold" style="background:${color}22;color:${color};border:1px solid ${color}55">${txt}</span>`;
+
+function backupBadge(c) {
+  if (!c.backup_integrity_ok) return badge('CORROMPIDO', COLORS.ALTO_RISCO);
+  if (c.backup_size_anomaly) return badge('TRUNCADO ' + c.backup_size_mb + 'MB', COLORS.ALTO_RISCO);
+  if (c.backup_age_hours <= 24) return badge('OK · hoje', COLORS.BAIXO_RISCO);
+  const col = c.backup_age_days >= 7 ? COLORS.ALTO_RISCO : c.backup_age_days >= 2 ? COLORS.ATENCAO : COLORS.BAIXO_RISCO;
+  return badge(c.backup_age_days + ' dias atrás', col);
+}
+function verBadge(v) { return badge(v, v === 'v5.2' ? COLORS.BAIXO_RISCO : v === 'v5.1' ? COLORS.ATENCAO : COLORS.ALTO_RISCO); }
+function usageHtml(p) {
+  const col = p <= -30 ? COLORS.ALTO_RISCO : p <= -15 ? COLORS.ATENCAO : COLORS.BAIXO_RISCO;
+  return `<span style="color:${col}" class="font-semibold">${p > 0 ? '▲ +' : p < 0 ? '▼ ' : ''}${p.toFixed(0)}%</span>`;
+}
+function scoreBadge(c) {
+  const col = COLORS[c.status];
+  return `<div class="flex items-center gap-2"><div class="w-24 h-2 rounded bg-white/10 overflow-hidden"><div class="h-full" style="width:${c.health_score}%;background:${col}"></div></div>
+    <span class="font-extrabold text-base" style="color:${col}">${c.health_score}</span></div>`;
+}
+
+function renderKpis(s) {
+  $('kTotal').textContent = s.total; $('kOk').textContent = s.healthy; $('kWarn').textContent = s.warning; $('kCrit').textContent = s.critical;
+}
+
+function renderQueue() {
+  $('queue').innerHTML = clients.map((c, i) => {
+    const changed = !firstLoad && prev[c.id] !== undefined && prev[c.id] !== c.health_score;
+    return `<tr class="border-t border-white/5 hover:bg-white/5 ${changed ? 'flash' : ''}">
+      <td class="p-3 font-bold text-slate-400">${i + 1}</td>
+      <td class="p-3"><div class="font-semibold">${esc(c.name)}</div><div class="text-xs text-slate-400">${esc(c.segment)} · ${esc(c.city)}${c.open_ticket ? ' · <span class="text-cyan-300">em atendimento</span>' : ''}</div></td>
+      <td class="p-3">${verBadge(esc(c.version))}</td>
+      <td class="p-3">${backupBadge(c)}</td>
+      <td class="p-3">${usageHtml(c.usage_change_pct)}</td>
+      <td class="p-3"><span class="${c.tickets_last_30d >= 6 ? 'text-red-400 font-bold' : ''}">${c.tickets_last_30d}</span></td>
+      <td class="p-3">${scoreBadge(c)}</td>
+      <td class="p-3 text-right"><button data-id="${esc(c.id)}" class="open360 px-3 py-1.5 rounded-lg text-xs font-semibold bg-[#00d2ff]/15 text-[#00d2ff] border border-[#00d2ff]/40 hover:bg-[#00d2ff]/30">Ver Cliente 360</button></td></tr>`;
+  }).join('');
+}
+
+function gauge(c) {
+  const col = COLORS[c.status], C = 2 * Math.PI * 54;
+  return `<div class="relative w-44 h-44 mx-auto"><svg viewBox="0 0 120 120" class="w-full h-full -rotate-90">
+    <circle cx="60" cy="60" r="54" fill="none" stroke="#ffffff14" stroke-width="10"/>
+    <circle class="ring-gauge" cx="60" cy="60" r="54" fill="none" stroke="${col}" stroke-width="10" stroke-linecap="round" stroke-dasharray="${C * c.health_score / 100} ${C}"/></svg>
+    <div class="absolute inset-0 flex flex-col items-center justify-center"><div class="text-5xl font-extrabold" style="color:${col}">${c.health_score}</div><div class="text-xs text-slate-400">/ 100</div></div></div>
+    <div class="text-center mt-2 text-xl font-extrabold" style="color:${col}">${c.health_score}/100 · ${esc(c.status_label)}</div>`;
+}
+
+function profileCard(c) {
+  const p = c.profile, row = (k, v) => `<div><span class="text-slate-500">${k}:</span> ${esc(v)}</div>`;
+  return `<div class="mt-5 card p-4 text-sm border-cyan-400/40">
+    <h3 class="font-bold mb-2 flex items-center gap-2"><i data-lucide="headset" class="w-5 h-5 text-[#00d2ff]"></i>Ficha do Atendimento · Ticket #${c.open_ticket.id}</h3>
+    <div class="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+      ${row('Responsável', p.owner)}${row('Telefone', p.phone)}${row('E-mail', p.email)}${row('CNPJ', p.cnpj)}
+      ${row('Plano', p.plan)}${row('PDVs', p.pdv_count)}${row('Mensalidade', 'R$ ' + p.monthly_fee.toLocaleString('pt-BR', {minimumFractionDigits: 2}))}${row('Cliente desde', p.client_since)}
+      ${row('Gerente de conta', p.account_manager)}${row('Técnico', p.technician)}${row('Acesso remoto', p.remote_access)}${row('Melhor horário', p.preferred_contact_time)}
+    </div>
+    <div class="text-xs mt-1">${row('Endereço', p.address)}</div>
+    <div class="text-xs text-slate-400 mt-3 mb-1">Últimas interações</div>
+    <ul class="text-xs space-y-1 list-disc pl-5">${p.last_contacts.map(x => `<li>${esc(x)}</li>`).join('')}</ul>
+    <div class="text-xs text-slate-500 mt-3">Motivo: ${esc(c.open_ticket.note)}</div></div>`;
+}
+
+function renderPanel() {
+  const c = clients.find(x => x.id === selected);
+  if (!c) return;
+  const sig = (icon, title, body, p) => `<div class="card p-3"><div class="flex justify-between items-center text-xs text-slate-400"><span class="flex items-center gap-1.5"><i data-lucide="${icon}" class="w-4 h-4 text-[#00d2ff]"></i>${title}</span><span>${p.points.toFixed(1)}/${p.weight} pts</span></div><div class="mt-1.5 text-sm">${body}</div><div class="text-xs text-slate-500 mt-1">${esc(p.detail)}</div></div>`;
+  const P = Object.fromEntries(c.pillars.map(p => [p.key, p]));
+  const col = COLORS[c.status];
+  $('panelBody').innerHTML = `
+    <div class="flex justify-between items-start"><div><h2 class="text-xl font-bold">${esc(c.name)}</h2><p class="text-sm text-slate-400">${esc(c.segment)} · ${esc(c.city)}</p></div>
+      <button id="closePanel" class="p-1 rounded hover:bg-white/10" aria-label="Fechar"><i data-lucide="x" class="w-6 h-6"></i></button></div>
+    <div class="my-5">${gauge(c)}</div>
+    <div class="grid grid-cols-2 gap-3">
+      ${sig('git-branch', 'Versão', verBadge(esc(c.version)), P.version)}
+      ${sig('database-backup', 'Backup', backupBadge(c) + `<div class="text-xs mt-1">${fmtDate(c.last_backup_date)}</div><div class="text-xs text-slate-400">${c.backup_size_mb}MB (anterior ${c.previous_backup_size_mb}MB)</div><div class="text-xs text-slate-400 break-all">hash: ${esc(c.backup_checksum)}</div>`, P.backup)}
+      ${sig('trending-up', 'Utilização', usageHtml(c.usage_change_pct) + `<div class="text-xs text-slate-400">${c.sales_last_7d.toLocaleString('pt-BR')} vs média ${c.sales_avg_weekly.toLocaleString('pt-BR')}</div>`, P.sales)}
+      ${sig('headset', 'Chamados', `<b>${c.tickets_last_30d}</b> em 30 dias`, P.tickets)}
+    </div>
+    <div class="mt-5 rounded-xl p-4 border-2" style="border-color:${col};background:${col}12">
+      <h3 class="font-bold mb-2 flex items-center gap-2"><i data-lucide="clipboard-check" class="w-5 h-5" style="color:${col}"></i>Recomendação de Ação (O que deve ser feito)</h3>
+      <ul class="space-y-2 text-sm list-disc pl-5">${c.recommended_actions.map(a => `<li>${esc(a)}</li>`).join('')}</ul></div>
+    ${c.open_ticket && c.profile ? profileCard(c) : ''}
+    <button id="ticketBtn" ${c.open_ticket ? 'disabled' : ''} class="mt-5 w-full py-3 rounded-xl font-bold ${c.open_ticket ? 'bg-emerald-600/30 text-emerald-300 cursor-default' : 'bg-gradient-to-r from-[#00d2ff] to-blue-500 text-[#0a192f] hover:opacity-90'}">
+      ${c.open_ticket ? 'Em atendimento · Ticket #' + c.open_ticket.id : 'Assumir Atendimento / Abrir Ticket Preventivo'}</button>
+    ${c.open_ticket ? `<button id="cancelBtn" class="mt-2 w-full py-2.5 rounded-xl font-semibold border border-red-500/50 text-red-300 hover:bg-red-500/10">Cancelar Ticket</button>` : ''}
+    <p class="text-xs text-slate-500 mt-3 text-center">Última telemetria: ${fmtDate(c.updated_at)}</p>`;
+  lucide.createIcons();
+  $('closePanel').onclick = closePanel;
+  const tb = $('ticketBtn');
+  const cb = $('cancelBtn');
+  if (cb) cb.onclick = async () => {
+    if (!confirm('Cancelar o ticket de ' + c.name + '?')) return;
+    cb.disabled = true;
+    const r = await fetch(`/api/v1/clients/${encodeURIComponent(c.id)}/ticket`, { method: 'DELETE' });
+    if (r.ok) { toast(`Ticket #${c.open_ticket.id} cancelado (${c.name})`, 'info'); refresh(); } else cb.disabled = false;
+  };
+  if (!c.open_ticket) tb.onclick = async () => {
+    tb.disabled = true;
+    const r = await fetch(`/api/v1/clients/${encodeURIComponent(c.id)}/ticket`, { method: 'POST' });
+    if (r.ok) { const d = await r.json(); toast(`Ticket #${d.ticket.id} aberto para ${c.name}`, 'ok'); refresh(); } else tb.disabled = false;
+  };
+}
+function openPanel(id) { selected = id; $('overlay').classList.remove('hidden'); $('panel').classList.remove('translate-x-full'); renderPanel(); }
+function closePanel() { selected = null; $('overlay').classList.add('hidden'); $('panel').classList.add('translate-x-full'); }
+$('overlay').onclick = closePanel;
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closePanel(); });
+$('queue').addEventListener('click', e => { const b = e.target.closest('.open360'); if (b) openPanel(b.dataset.id); });
+
+// ---------- data ----------
+async function refresh() {
+  try {
+    const r = await fetch('/api/v1/clients', { cache: 'no-store' });
+    const d = await r.json();
+    clients = d.clients;
+    renderKpis(d.summary); updateCharts(); renderQueue();
+    if (selected) renderPanel();
+    prev = Object.fromEntries(clients.map(c => [c.id, c.health_score]));
+    firstLoad = false;
+    $('updated').textContent = 'Atualizado ' + new Date().toLocaleTimeString('pt-BR');
+    $('liveTxt').textContent = 'AO VIVO'; $('liveTxt').classList.remove('text-red-400');
+  } catch (e) { $('liveTxt').textContent = 'SEM CONEXÃO'; $('liveTxt').classList.add('text-red-400'); }
+}
+
+// ---------- alerts ----------
+function toast(msg, kind) {
+  const el = document.createElement('div');
+  const col = kind === 'crit' ? '#ef4444' : kind === 'ok' ? '#10b981' : '#00d2ff';
+  el.className = 'toast card glow p-3 text-sm flex gap-2 items-start';
+  el.style.borderColor = col;
+  el.innerHTML = `<span style="color:${col}">${kind === 'crit' ? '🚨' : 'ℹ️'}</span><span>${esc(msg)}</span>`;
+  $('toasts').appendChild(el);
+  setTimeout(() => el.remove(), kind === 'crit' ? 9000 : 4500);
+}
+
+function onEvent(e) {
+  if (seenEvents.has(e.id)) return;
+  seenEvents.add(e.id);
+  const col = e.critical ? COLORS.ALTO_RISCO : e.new_score < e.old_score ? COLORS.ATENCAO : COLORS.BAIXO_RISCO;
+  const log = $('evLog');
+  if (log.querySelector('p')) log.innerHTML = '';
+  const row = document.createElement('div');
+  row.className = 'flash rounded p-1.5 border-l-2';
+  row.style.borderColor = col;
+  row.innerHTML = `<span class="text-slate-500">${new Date(e.time).toLocaleTimeString('pt-BR')}</span> ${esc(e.message)}`;
+  log.prepend(row);
+  while (log.children.length > 40) log.lastChild.remove();
+  if (e.critical) {
+    toast(e.message, 'crit');
+    unread++; $('bellCount').textContent = unread; $('bellCount').classList.remove('hidden');
+    $('bellIcon').classList.remove('ring'); void $('bellIcon').offsetWidth; $('bellIcon').classList.add('ring');
+    const b = $('banner'); b.textContent = '🚨 ' + e.message; b.classList.remove('hidden');
+    clearTimeout(onEvent.t); onEvent.t = setTimeout(() => b.classList.add('hidden'), 10000);
+    const item = document.createElement('div');
+    item.className = 'p-2 rounded bg-red-500/10 border border-red-500/30';
+    item.textContent = new Date(e.time).toLocaleTimeString('pt-BR') + ' · ' + e.message;
+    $('bellList').prepend(item);
+  }
+}
+$('bellBtn').onclick = () => { $('bellPanel').classList.toggle('hidden'); unread = 0; $('bellCount').classList.add('hidden'); };
+$('bellClear').onclick = () => { $('bellList').innerHTML = ''; };
+
+async function init() {
+  lucide.createIcons();
+  await refresh();
+  try { (await (await fetch('/api/v1/events/recent')).json()).forEach(e => seenEvents.add(e.id)); } catch (e) {}
+  const es = new EventSource('/api/v1/events');
+  es.addEventListener('telemetry', m => { onEvent(JSON.parse(m.data)); refresh(); });
+  setInterval(refresh, 2000);
+}
+init();
+</script>
+</body>
+</html>

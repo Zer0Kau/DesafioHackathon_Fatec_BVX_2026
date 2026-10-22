@@ -1,0 +1,18 @@
+# SQLite gerado em runtime
+*.db
+*.db-shm
+*.db-wal
+
+# Binários e artefatos
+/server
+/pdv-simulator
+*.exe
+*.test
+*.out
+
+# Ambiente / editor
+.env
+.env.*
+.vscode/
+.idea/
+.DS_Store
